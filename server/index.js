@@ -36,6 +36,28 @@ app.get('/employees', async (req, res) => {
   }
 });
 
+app.post('/employees', async (req, res) => {
+  try {
+    const { name, role, email, phone } = req.body;
+
+    if (!name || !role) {
+      return res.status(400).json({ error: 'name and role are required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO employees (manager_id, name, role, email, phone)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [1, name, role, email, phone]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
