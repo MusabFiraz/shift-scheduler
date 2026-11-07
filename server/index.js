@@ -58,6 +58,25 @@ app.post('/employees', async (req, res) => {
   }
 });
 
+app.delete('/employees/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM employees WHERE id = $1 RETURNING *',   // DELETE FROM employees WHERE id = $1, plus RETURNING *
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      // send a 404 with an error message
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
