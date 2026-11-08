@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('./db');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = 3000;
@@ -103,6 +104,32 @@ app.post('/auth/register', async (req, res) => {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'email already registered' });
     }
+    console.error(err);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    const passwordOk = user && await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordOk) {
+      return res.status(401).json({ error: 'invalid email or password' });
+    }
+
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '8h' });
+
+    res.json({ token });
+  } catch (err) {
     console.error(err);
     res.status(500).json({ status: 'error' });
   }
