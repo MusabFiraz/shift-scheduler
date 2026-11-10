@@ -8,6 +8,23 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Gatekeeper: runs before protected routes and checks the login token
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'missing token' });
+  }
+
+  try {
+    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET);
+    req.userId = payload.userId;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'invalid or expired token' });
+  }
+}
+
 // Is the server alive?
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -24,13 +41,19 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
-// List employees, optionally filtered by ?role=
-app.get('/employees', async (req, res) => {
+// List MY employees, optionally filtered by ?role= (login required)
+app.get('/employees', requireAuth, async (req, res) => {
   try {
     const { role } = req.query;
     const result = role
-      ? await pool.query('SELECT * FROM employees WHERE role = $1', [role])
-      : await pool.query('SELECT * FROM employees');
+      ? await pool.query(
+          'SELECT * FROM employees WHERE manager_id = $1 AND role = $2',
+          [req.userId, role]
+        )
+      : await pool.query(
+          'SELECT * FROM employees WHERE manager_id = $1',
+          [req.userId]
+        );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -38,7 +61,7 @@ app.get('/employees', async (req, res) => {
   }
 });
 
-// Create an employee (manager_id is hardcoded until login exists)
+// Create an employee (manager_id is hardcoded until we protect this route)
 app.post('/employees', async (req, res) => {
   try {
     const { name, role, email, phone } = req.body;
@@ -61,7 +84,7 @@ app.post('/employees', async (req, res) => {
   }
 });
 
-// Delete an employee by id
+// Delete an employee by id (not protected yet)
 app.delete('/employees/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -109,6 +132,7 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
+// Log in: check the password, hand back a signed token
 app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
