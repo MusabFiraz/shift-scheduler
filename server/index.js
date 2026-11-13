@@ -14,7 +14,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clean = (value) => (typeof value === 'string' ? value.trim() : '');
 
 
-// Gatekeeper: runs before protected routes and checks the login token
+// Gatekeeper: checks the login token and saves who is asking
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -24,7 +24,14 @@ function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET);
+
+    // Tokens from before multi-tenancy have no businessId, so reject them
+    if (!payload.businessId) {
+      return res.status(401).json({ error: 'invalid token, please log in again' });
+    }
+
     req.userId = payload.userId;
+    req.businessId = payload.businessId; // always from the verified token
     next();
   } catch (err) {
     return res.status(401).json({ error: 'invalid or expired token' });
@@ -169,7 +176,7 @@ app.post('/auth/login', async (req, res) => {
     console.error(err);
     res.status(500).json({ status: 'error' });
   }
-  
+
 });
 
 app.post('/auth/signup', async (req, res) => {
