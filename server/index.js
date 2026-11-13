@@ -8,6 +8,12 @@ const PORT = 3000;
 
 app.use(express.json());
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Returns trimmed text if it's a string, otherwise an empty string
+const clean = (value) => (typeof value === 'string' ? value.trim() : '');
+
+
 // Gatekeeper: runs before protected routes and checks the login token
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
@@ -135,7 +141,9 @@ app.post('/auth/register', async (req, res) => {
 // Log in: check the password, hand back a signed token
 app.post('/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+   
+    const email = clean(req.body.email).toLowerCase();
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
 
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' });
@@ -149,20 +157,20 @@ app.post('/auth/login', async (req, res) => {
     if (!passwordOk) {
       return res.status(401).json({ error: 'invalid email or password' });
     }
-
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '8h' });
-
+    
+    const token = jwt.sign(
+      { userId: user.id, businessId: user.business_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+    
     res.json({ token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: 'error' });
   }
+  
 });
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Returns trimmed text if it's a string, otherwise an empty string
-const clean = (value) => (typeof value === 'string' ? value.trim() : '');
 
 app.post('/auth/signup', async (req, res) => {
   const businessName = clean(req.body.businessName);
