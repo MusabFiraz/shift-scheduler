@@ -74,22 +74,33 @@ app.get('/employees', requireAuth, async (req, res) => {
   }
 });
 
-// Create an employee (manager_id is hardcoded until we protect this route)
-app.post('/employees', async (req, res) => {
+// Create an employee in MY business (login required)
+app.post('/employees', requireAuth, async (req, res) => {
+  const name = clean(req.body.name);
+  const role = clean(req.body.role).toLowerCase();
+  const email = clean(req.body.email).toLowerCase();
+  const phone = clean(req.body.phone);
+
+  if (!name || name.length > 100) {
+    return res.status(400).json({ error: 'name is required (max 100 characters)' });
+  }
+  if (!role || role.length > 50) {
+    return res.status(400).json({ error: 'role is required (max 50 characters)' });
+  }
+  if (email && (!EMAIL_REGEX.test(email) || email.length > 254)) {
+    return res.status(400).json({ error: 'email is not valid' });
+  }
+  if (phone.length > 30) {
+    return res.status(400).json({ error: 'phone is too long (max 30 characters)' });
+  }
+
   try {
-    const { name, role, email, phone } = req.body;
-
-    if (!name || !role) {
-      return res.status(400).json({ error: 'name and role are required' });
-    }
-
     const result = await pool.query(
-      `INSERT INTO employees (manager_id, name, role, email, phone)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO employees (business_id, manager_id, name, role, email, phone)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [1, name, role, email, phone]
+      [req.businessId, req.userId, name, role, email || null, phone || null]
     );
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
