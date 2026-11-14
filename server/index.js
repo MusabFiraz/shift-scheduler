@@ -54,18 +54,18 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
-// List MY employees, optionally filtered by ?role= (login required)
+// List MY BUSINESS's employees, optionally filtered by ?role=
 app.get('/employees', requireAuth, async (req, res) => {
   try {
-    const { role } = req.query;
+    const role = clean(req.query.role);
     const result = role
       ? await pool.query(
-          'SELECT * FROM employees WHERE manager_id = $1 AND role = $2',
-          [req.userId, role]
+          'SELECT * FROM employees WHERE business_id = $1 AND role = $2 ORDER BY name',
+          [req.businessId, role]
         )
       : await pool.query(
-          'SELECT * FROM employees WHERE manager_id = $1',
-          [req.userId]
+          'SELECT * FROM employees WHERE business_id = $1 ORDER BY name',
+          [req.businessId]
         );
     res.json(result.rows);
   } catch (err) {
