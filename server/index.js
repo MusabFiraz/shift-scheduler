@@ -133,34 +133,6 @@ app.delete('/employees/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Register a manager account (password is hashed, never stored as-is)
-app.post('/auth/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'name, email and password are required' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const result = await pool.query(
-      `INSERT INTO users (name, email, password_hash)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, email`,
-      [name, email, passwordHash]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'email already registered' });
-    }
-    console.error(err);
-    res.status(500).json({ status: 'error' });
-  }
-});
-
 // Log in: check the password, hand back a signed token
 app.post('/auth/login', async (req, res) => {
   try {
