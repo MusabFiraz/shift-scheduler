@@ -108,13 +108,18 @@ app.post('/employees', requireAuth, async (req, res) => {
   }
 });
 
-// Delete an employee by id (not protected yet)
-app.delete('/employees/:id', async (req, res) => {
+// Delete an employee in MY business (login required)
+app.delete('/employees/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: 'invalid employee id' });
+  }
+
   try {
-    const { id } = req.params;
     const result = await pool.query(
-      'DELETE FROM employees WHERE id = $1 RETURNING *',
-      [id]
+      'DELETE FROM employees WHERE id = $1 AND business_id = $2 RETURNING *',
+      [id, req.businessId]
     );
 
     if (result.rows.length === 0) {
