@@ -96,10 +96,10 @@ app.post('/employees', requireAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO employees (business_id, manager_id, name, role, email, phone)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO employees (business_id, name, role, email, phone)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [req.businessId, req.userId, name, role, email || null, phone || null]
+      [req.businessId, name, role, email || null, phone || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
