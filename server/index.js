@@ -9,6 +9,7 @@ const PORT = 3000;
 app.use(express.json());
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Returns trimmed text if it's a string, otherwise an empty string
 const clean = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -216,6 +217,53 @@ app.post('/auth/signup', async (req, res) => {
     res.status(500).json({ status: 'error' });
   } finally {
     client.release();
+  }
+});
+
+// Add an availability window for one of MY employees
+app.post('/employees/:id/availability', requireAuth, async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const dayOfWeek = req.body.dayOfWeek;
+  const startTime = clean(req.body.startTime);
+  const endTime = clean(req.body.endTime);
+  const note = clean(req.body.note);
+
+  if (!Number.isInteger(employeeId) || employeeId < 1) {
+    return res.status(400).json({ error: 'invalid employee id' });
+  }
+  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+    return res.status(400).json({ error: 'dayOfWeek must be 0 (Sunday) to 6 (Saturday)' });
+  }
+  if (!TIME_REGEX.test(startTime) || !TIME_REGEX.test(endTime)) {
+    return res.status(400).json({ error: 'startTime and endTime must look like 16:00' });
+  }
+  if (endTime <= startTime) {
+    return res.status(400).json({ error: 'endTime must be after startTime' });
+  }
+  if (note.length > 200) {
+    return res.status(400).json({ error: 'note is too long (max 200 characters)' });
+  }
+
+  try {
+    // Is this employee in MY business?
+    const owner = await pool.query(
+      'SELECT id FROM employees WHERE id = $1 AND business_id = $2',
+      [employeeId, req.businessId]
+    );
+    if (owner.rows.length === 0) {
+      return res.status(404).json({ error: 'employee not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO availability (business_id, employee_id, day_of_week, start_time, end_time, note)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [req.businessId, employeeId, dayOfWeek, startTime, endTime, note || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error' });
   }
 });
 
