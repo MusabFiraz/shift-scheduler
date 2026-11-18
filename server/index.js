@@ -250,8 +250,20 @@ app.post('/employees/:id/availability', requireAuth, async (req, res) => {
       'SELECT id FROM employees WHERE id = $1 AND business_id = $2',
       [employeeId, req.businessId]
     );
+    
     if (owner.rows.length === 0) {
       return res.status(404).json({ error: 'employee not found' });
+    }
+    
+    const overlap = await pool.query(
+      `SELECT id FROM availability
+       WHERE employee_id = $1 AND business_id = $2 AND day_of_week = $3
+         AND start_time < $5 AND end_time > $4`,
+      [employeeId, req.businessId, dayOfWeek, startTime, endTime]
+    );
+    
+    if (overlap.rows.length > 0) {
+      return res.status(409).json({ error: 'overlaps an existing availability window' });
     }
 
     const result = await pool.query(
