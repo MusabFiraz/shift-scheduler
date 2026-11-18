@@ -267,6 +267,66 @@ app.post('/employees/:id/availability', requireAuth, async (req, res) => {
   }
 });
 
+// List availability windows for one of MY employees
+app.get('/employees/:id/availability', requireAuth, async (req, res) => {
+  const employeeId = Number(req.params.id);
+
+  if (!Number.isInteger(employeeId) || employeeId < 1) {
+    return res.status(400).json({ error: 'invalid employee id' });
+  }
+
+  try {
+    const owner = await pool.query(
+      'SELECT id FROM employees WHERE id = $1 AND business_id = $2',
+      [employeeId, req.businessId]
+    );
+    if (owner.rows.length === 0) {
+      return res.status(404).json({ error: 'employee not found' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, day_of_week, start_time, end_time, note
+       FROM availability
+       WHERE employee_id = $1 AND business_id = $2
+       ORDER BY day_of_week, start_time`,
+      [employeeId, req.businessId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
+// Remove one availability window from one of MY employees
+app.delete('/employees/:id/availability/:windowId', requireAuth, async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const windowId = Number(req.params.windowId);
+
+  if (!Number.isInteger(employeeId) || employeeId < 1 ||
+      !Number.isInteger(windowId) || windowId < 1) {
+    return res.status(400).json({ error: 'invalid id' });
+  }
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM availability
+       WHERE id = $1 AND employee_id = $2 AND business_id = $3
+       RETURNING *`,
+      [windowId, employeeId, req.businessId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'availability window not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
