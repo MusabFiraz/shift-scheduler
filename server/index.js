@@ -2,8 +2,10 @@ const express = require('express');
 const pool = require('./db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 
 const app = express();
+app.use(cors({ origin: 'http://localhost:5173' }));
 const PORT = 3000;
 
 app.use(express.json());
